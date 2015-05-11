@@ -22,6 +22,7 @@
 			background-color: #fff;
 			padding: 20px;
 			border: 1px solid #ddd;
+			margin-bottom: 10px;
 		}
 		.content > h1, .content > h2, .content > h3 {
 			margin-top: 10px;
@@ -64,12 +65,17 @@
 	<a href="{{.Profile.Github}}" rel="me">Github</a>
 </div>
 <div class="col-sm-9">
-{{.PostForm}}
+{{if .PostForm}}
 <div class="content">
-{{range .Posts}}
-{{.Render}}
-{{end}}
+{{.PostForm}}
 </div>
+{{end}}
+
+{{range .Posts}}
+<div class="content">
+{{.Rendered}}
+</div>
+{{end}}
 </div>
 
 </div>

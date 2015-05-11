@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"html/template"
 )
@@ -11,11 +12,11 @@ type Profile struct {
 
 type PostData struct {
 	Type    string
-	Content json.RawMessage
+	Content *json.RawMessage
 }
 
 type Post interface {
-	Render() template.HTML
+	Render(t *template.Template) template.HTML
 }
 
 type HEntry struct {
@@ -23,7 +24,7 @@ type HEntry struct {
 
 type Note struct {
 	HEntry
-	Content string
+	Message string
 	Draft   bool
 }
 
@@ -37,7 +38,7 @@ func UnmarshalPost(data []byte) Post {
 	switch post.Type {
 	case TypeNote:
 		var note Note
-		json.Unmarshal(post.Content, note)
+		json.Unmarshal(*post.Content, &note)
 		return note
 	}
 	return nil
@@ -46,7 +47,8 @@ func UnmarshalPost(data []byte) Post {
 func MarshalPost(post Post) []byte {
 	contentdata, _ := json.Marshal(post)
 	var data PostData
-	data.Content = contentdata
+	contentjson := json.RawMessage(contentdata)
+	data.Content = &contentjson
 	switch post.(type) {
 	case Note:
 		data.Type = TypeNote
@@ -55,6 +57,8 @@ func MarshalPost(post Post) []byte {
 	return datadata
 }
 
-func (n Note) Render() template.HTML {
-	return template.HTML(n.Content)
+func (n Note) Render(t *template.Template) template.HTML {
+	buf := &bytes.Buffer{}
+	t.ExecuteTemplate(buf, "note.tpl", n)
+	return template.HTML(buf.String())
 }

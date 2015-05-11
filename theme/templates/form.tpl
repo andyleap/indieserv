@@ -23,9 +23,6 @@
 			padding: 20px;
 			border: 1px solid #ddd;
 		}
-		.content.no-nav {
-			border-top: 1px solid #ddd;
-		}
 		.content > h1, .content > h2, .content > h3 {
 			margin-top: 10px;
 		}
@@ -63,7 +60,7 @@
 <div class="col-sm-3">
 </div>
 <div class="col-sm-9">
-<div class="content no-nav">
+<div class="content">
 <h1>{{.FormName}}</h1>
 {{.Form}}
 </div>

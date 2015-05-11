@@ -18,12 +18,13 @@ import (
 )
 
 type Blog struct {
-	templates *template.Template
-	static    tartheme.Assets
-	router    *mux.Router
-	db        *bolt.DB
-	fb        *formbuilder.FormBuilder
-	c         *cookiestore.CookieStore
+	templates      *template.Template
+	microtemplates *template.Template
+	static         tartheme.Assets
+	router         *mux.Router
+	db             *bolt.DB
+	fb             *formbuilder.FormBuilder
+	c              *cookiestore.CookieStore
 }
 
 func UrlToPath(url *url.URL, err error) string {
@@ -46,6 +47,7 @@ func main() {
 
 	blog := &Blog{}
 	blog.templates = theme.Prefix("templates/").Templates()
+	blog.microtemplates = theme.Prefix("templates/microformats/").Templates()
 	blog.router = mux.NewRouter()
 	blog.db = db
 
@@ -63,7 +65,7 @@ func main() {
 	btns.AddButton("Save", "Save", "primary")
 
 	postform := blog.fb.NewForm("post")
-	postform.NewString("Content", "Content", "Content", "")
+	postform.NewString("Message", "Message", "Message", "")
 	postform.NewBool("Draft", "Draft")
 	btns = postform.NewButtons()
 	btns.AddButton("Post", "Post", "primary")
@@ -125,15 +127,29 @@ func (b *Blog) Index(rw http.ResponseWriter, req *http.Request) {
 		postformrender = postform.Render(nil, UrlToPath(b.router.Get("ContentPost").URL()), "POST")
 	}
 
+	postsrendered := make([]struct {
+		Rendered template.HTML
+	}, 0, len(posts))
+
+	for _, post := range posts {
+		postsrendered = append(postsrendered, struct {
+			Rendered template.HTML
+		}{
+			post.Render(b.microtemplates),
+		})
+	}
+
 	data := struct {
-		Name     string
-		Profile  Profile
-		Posts    []Post
+		Name    string
+		Profile Profile
+		Posts   []struct {
+			Rendered template.HTML
+		}
 		PostForm template.HTML
 	}{
 		"Index",
 		profile,
-		posts,
+		postsrendered,
 		postformrender,
 	}
 	err := b.templates.ExecuteTemplate(rw, "index.tpl", data)
