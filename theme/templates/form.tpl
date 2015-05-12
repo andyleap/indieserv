@@ -7,7 +7,7 @@
 
 
 
-    <title>GoWiki - {{.Name}}</title>
+    <title>IndieServ - {{.Name}}</title>
 
     <link href="/static/css/bootstrap.min.css" rel="stylesheet">
     <!--[if lt IE 9]>
@@ -41,7 +41,7 @@
         <span class="icon-bar"></span>
         <span class="icon-bar"></span>
       </button>
-      <a class="navbar-brand" href="#">IndieServ</a>
+      <a class="navbar-brand" href="/">IndieServ</a>
     </div>
 
     <!-- Collect the nav links, forms, and other content for toggling -->

@@ -3,11 +3,15 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
+	"time"
 )
 
 type Profile struct {
-	Github string
+	Name    string
+	HomeURL string
+	Github  string
 }
 
 type PostData struct {
@@ -20,6 +24,7 @@ type Post interface {
 }
 
 type HEntry struct {
+	Published time.Time
 }
 
 type Note struct {
@@ -59,6 +64,12 @@ func MarshalPost(post Post) []byte {
 
 func (n Note) Render(t *template.Template) template.HTML {
 	buf := &bytes.Buffer{}
-	t.ExecuteTemplate(buf, "note.tpl", n)
+	if err := t.ExecuteTemplate(buf, "note.tpl", n); err != nil {
+		fmt.Println(err)
+	}
 	return template.HTML(buf.String())
+}
+
+func (e HEntry) Slug() string {
+	return TimeToSlug(e.Published)
 }

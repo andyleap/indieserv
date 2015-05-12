@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"net/url"
+	"time"
 
 	"github.com/andyleap/cookiestore"
 	"github.com/andyleap/formbuilder"
@@ -27,13 +27,6 @@ type Blog struct {
 	c              *cookiestore.CookieStore
 }
 
-func UrlToPath(url *url.URL, err error) string {
-	if err != nil {
-		panic(err)
-	}
-	return url.Path
-}
-
 func main() {
 	theme, _ := tartheme.LoadDir("theme")
 	db, _ := bolt.Open("blog.db", 0666, nil)
@@ -47,7 +40,10 @@ func main() {
 
 	blog := &Blog{}
 	blog.templates = theme.Prefix("templates/").Templates()
-	blog.microtemplates = theme.Prefix("templates/microformats/").Templates()
+	blog.microtemplates = theme.Prefix("templates/microformats/").AddTemplates(template.New("default").Funcs(template.FuncMap{
+		"Route":    blog.Route,
+		"AbsRoute": blog.AbsRoute,
+	}))
 	blog.router = mux.NewRouter()
 	blog.db = db
 
@@ -60,6 +56,8 @@ func main() {
 	btns.AddButton("login", "Login", "primary")
 
 	profileform := blog.fb.NewForm("profile")
+	profileform.NewString("Name", "Name", "Name", "")
+	profileform.NewString("HomeURL", "HomeURL", "HomeURL", "")
 	profileform.NewString("Github", "Github", "Github", "")
 	btns = profileform.NewButtons()
 	btns.AddButton("Save", "Save", "primary")
@@ -78,6 +76,8 @@ func main() {
 	mainchain := alice.New()
 	authchain := mainchain.Append(blog.RequireLogin)
 	blog.router.Handle("/", mainchain.ThenFunc(blog.Index)).Methods("GET").Name("Home")
+	blog.router.Handle("/post/{id}", mainchain.ThenFunc(blog.Post)).Methods("GET").Name("Post")
+	//blog.router.Handle("/post/{id}", authchain.ThenFunc(blog.SavePost)).Methods("POST").Name("Post")
 	blog.router.Handle("/", authchain.ThenFunc(blog.ContentPost)).Methods("POST").Name("ContentPost")
 	blog.router.Handle("/login", mainchain.ThenFunc(blog.Login)).Methods("GET").Name("Login")
 	blog.router.Handle("/login", mainchain.ThenFunc(blog.LoginPost)).Methods("POST").Name("LoginPost")
@@ -158,15 +158,64 @@ func (b *Blog) Index(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (b *Blog) Post(rw http.ResponseWriter, req *http.Request) {
+	var profile Profile
+	var post Post
+	s := b.c.GetSession(req)
+	_, loggedin := s.Values["user"]
+
+	b.db.View(func(tx *bolt.Tx) error {
+		profiledata := tx.Bucket([]byte("config")).Get([]byte("Profile"))
+		json.Unmarshal(profiledata, &profile)
+		postbucket := tx.Bucket([]byte("posts"))
+		postdata := postbucket.Get(TimeToID(SlugToTime(mux.Vars(req)["id"])))
+		post = UnmarshalPost(postdata)
+		return nil
+	})
+	switch post := post.(type) {
+	case Note:
+		if !loggedin && post.Draft {
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+	case nil:
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+	var postformrender template.HTML
+	if loggedin {
+		postform := b.fb.GetForm("post")
+		postformrender = postform.Render(post, UrlToPath(b.router.Get("ContentPost").URL()), "POST")
+	}
+
+	postrendered := post.Render(b.microtemplates)
+
+	data := struct {
+		Name     string
+		Profile  Profile
+		Post     template.HTML
+		PostForm template.HTML
+	}{
+		"Post",
+		profile,
+		postrendered,
+		postformrender,
+	}
+	err := b.templates.ExecuteTemplate(rw, "post.tpl", data)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
 func (b *Blog) ContentPost(rw http.ResponseWriter, req *http.Request) {
 	form := b.fb.GetForm("post")
 	var data Note
 	form.Parse(req.FormValue, &data)
+	data.Published = time.Now()
 
 	b.db.Update(func(tx *bolt.Tx) error {
 		posts := tx.Bucket([]byte("posts"))
-		id := NextKey(posts)
-		posts.Put(id, MarshalPost(data))
+		posts.Put(TimeToID(data.Published), MarshalPost(data))
 		return nil
 	})
 	http.Redirect(rw, req, UrlToPath(b.router.Get("Home").URL()), http.StatusSeeOther)
@@ -239,10 +288,4 @@ func (b *Blog) AdminProfilePost(rw http.ResponseWriter, req *http.Request) {
 		return nil
 	})
 	http.Redirect(rw, req, UrlToPath(b.router.Get("AdminProfile").URL()), http.StatusSeeOther)
-}
-
-func NextKey(b *bolt.Bucket) []byte {
-	i, _ := b.NextSequence()
-	key, _ := json.Marshal(i)
-	return key
 }

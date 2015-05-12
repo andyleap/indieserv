@@ -77,12 +77,9 @@
 {{.PostForm}}
 </div>
 {{end}}
-
-{{range .Posts}}
 <div class="content">
-{{.Rendered}}
+{{.Post}}
 </div>
-{{end}}
 </div>
 
 </div>
