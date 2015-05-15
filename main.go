@@ -118,7 +118,7 @@ func main() {
 	data, _ := ioutil.ReadFile("login.json")
 	json.Unmarshal(data, &blog.li)
 
-	http.ListenAndServe(fmt.Sprintf(":%d", *Port), mainrouter)
+	http.ListenAndServe(fmt.Sprintf(":%d", *Port), blog.router)
 }
 
 func (b *Blog) RequireLogin(handler http.Handler) http.Handler {
