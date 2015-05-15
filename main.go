@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -36,7 +37,12 @@ type LoginInfo struct {
 	Password string
 }
 
+var (
+	Port = flag.Int("Port", 3000, "Specifies the port to listen on")
+)
+
 func main() {
+	flag.Parse()
 	theme, _ := tartheme.LoadDir("theme")
 	db, _ := bolt.Open("blog.db", 0666, nil)
 
@@ -109,7 +115,7 @@ func main() {
 	data, _ := ioutil.ReadFile("login.json")
 	json.Unmarshal(data, &blog.li)
 
-	http.ListenAndServe(":3000", blog.router)
+	http.ListenAndServe(fmt.Sprintf(":%d", *Port), blog.router)
 }
 
 func (b *Blog) RequireLogin(handler http.Handler) http.Handler {
