@@ -11,8 +11,7 @@ import (
 var AuthorizationRegex = regexp.MustCompile("Bearer (\\S+)")
 
 func (b *Blog) MicroPubEndpoint(rw http.ResponseWriter, req *http.Request) {
-	tokenID := GetMicroPubToken(req)
-	token := b.ia.GetAccessToken(tokenID)
+	token := b.ia.GetMicroPubToken(req)
 	if token == nil {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
@@ -57,14 +56,4 @@ func (b *Blog) MicroPubEndpoint(rw http.ResponseWriter, req *http.Request) {
 		}
 
 	}
-}
-
-func GetMicroPubToken(req *http.Request) string {
-	for _, header := range req.Header["Authorization"] {
-		matches := AuthorizationRegex.FindStringSubmatch(header)
-		if matches != nil {
-			return matches[1]
-		}
-	}
-	return req.FormValue("access_token")
 }
