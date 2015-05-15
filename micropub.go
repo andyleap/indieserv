@@ -2,16 +2,13 @@ package main
 
 import (
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/boltdb/bolt"
 )
 
-var AuthorizationRegex = regexp.MustCompile("Bearer (\\S+)")
-
 func (b *Blog) MicroPubEndpoint(rw http.ResponseWriter, req *http.Request) {
-	token := b.ia.GetMicroPubToken(req)
+	token := b.ia.GetReqAccessToken(req)
 	if token == nil {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
