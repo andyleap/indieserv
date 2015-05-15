@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"net/http"
 	"time"
 
 	"github.com/andyleap/cookiestore"
 	"github.com/andyleap/formbuilder"
+	"github.com/andyleap/goindieauth"
 	"github.com/andyleap/tartheme"
 
 	"github.com/boltdb/bolt"
@@ -25,6 +27,13 @@ type Blog struct {
 	db             *bolt.DB
 	fb             *formbuilder.FormBuilder
 	c              *cookiestore.CookieStore
+	ia             *goindieauth.IndieAuth
+	li             *LoginInfo
+}
+
+type LoginInfo struct {
+	Me       string
+	Password string
 }
 
 func main() {
@@ -39,10 +48,15 @@ func main() {
 	})
 
 	blog := &Blog{}
-	blog.templates = theme.Prefix("templates/").Templates()
+	blog.templates = theme.Prefix("templates/").AddTemplates(template.New("default").Funcs(template.FuncMap{
+		"Route":    blog.Route,
+		"AbsRoute": blog.AbsRoute,
+		"AutoLink": AutoLink,
+	}))
 	blog.microtemplates = theme.Prefix("templates/microformats/").AddTemplates(template.New("default").Funcs(template.FuncMap{
 		"Route":    blog.Route,
 		"AbsRoute": blog.AbsRoute,
+		"AutoLink": AutoLink,
 	}))
 	blog.router = mux.NewRouter()
 	blog.db = db
@@ -50,8 +64,9 @@ func main() {
 	blog.fb = formbuilder.New(theme.Prefix("templates/form/").Templates())
 	blog.c = cookiestore.New("IndieServe")
 	loginform := blog.fb.NewForm("login")
-	loginform.NewString("Username", "Username", "Username", "")
-	loginform.NewPassword("Password", "Password", "Password")
+	loginform.NewHidden("me")
+	loginform.NewHidden("token")
+	loginform.NewPassword("Password", "password", "Password")
 	btns := loginform.NewButtons()
 	btns.AddButton("login", "Login", "primary")
 
@@ -79,10 +94,20 @@ func main() {
 	blog.router.Handle("/post/{id}", mainchain.ThenFunc(blog.Post)).Methods("GET").Name("Post")
 	//blog.router.Handle("/post/{id}", authchain.ThenFunc(blog.SavePost)).Methods("POST").Name("Post")
 	blog.router.Handle("/", authchain.ThenFunc(blog.ContentPost)).Methods("POST").Name("ContentPost")
-	blog.router.Handle("/login", mainchain.ThenFunc(blog.Login)).Methods("GET").Name("Login")
-	blog.router.Handle("/login", mainchain.ThenFunc(blog.LoginPost)).Methods("POST").Name("LoginPost")
+	//blog.router.Handle("/login", mainchain.ThenFunc(blog.Login)).Methods("GET").Name("Login")
+	//blog.router.Handle("/login", mainchain.ThenFunc(blog.LoginPost)).Methods("POST").Name("LoginPost")
 	blog.router.Handle("/admin/profile", authchain.ThenFunc(blog.AdminProfile)).Methods("GET").Name("AdminProfile")
 	blog.router.Handle("/admin/profile", authchain.ThenFunc(blog.AdminProfilePost)).Methods("POST").Name("AdminProfilePost")
+
+	blog.ia = goindieauth.New()
+	blog.ia.InfoPage = blog.IAInfoPage
+	blog.ia.LoginPage = blog.IALoginPage
+	blog.ia.CheckLogin = blog.IACheckLogin
+
+	blog.router.Handle("/indieauth", blog.ia).Name("IndieAuthEndpoint")
+
+	data, _ := ioutil.ReadFile("login.json")
+	json.Unmarshal(data, &blog.li)
 
 	http.ListenAndServe(":3000", blog.router)
 }
@@ -288,4 +313,39 @@ func (b *Blog) AdminProfilePost(rw http.ResponseWriter, req *http.Request) {
 		return nil
 	})
 	http.Redirect(rw, req, UrlToPath(b.router.Get("AdminProfile").URL()), http.StatusSeeOther)
+}
+
+func (b *Blog) IALoginPage(rw http.ResponseWriter, user, token, client_id string) {
+	loginform := b.fb.GetForm("login")
+	formdata := struct {
+		me    string
+		token string
+	}{
+		user,
+		token,
+	}
+	data := struct {
+		Name     string
+		FormName string
+		Form     template.HTML
+	}{
+		"Login",
+		"Login for " + client_id,
+		loginform.Render(formdata, "/login", "POST"),
+	}
+
+	if err := b.templates.ExecuteTemplate(rw, "form.tpl", data); err != nil {
+		fmt.Println(err)
+	}
+}
+
+func (b *Blog) IAInfoPage(rw http.ResponseWriter) {
+
+}
+
+func (b *Blog) IACheckLogin(user, password string) bool {
+	if user == b.li.Me && password == b.li.Password {
+		return true
+	}
+	return false
 }
