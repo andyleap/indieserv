@@ -331,7 +331,7 @@ func (b *Blog) IALoginPage(rw http.ResponseWriter, user, token, client_id string
 	}{
 		"Login",
 		"Login for " + client_id,
-		loginform.Render(formdata, "/login", "POST"),
+		loginform.Render(formdata, "", "POST"),
 	}
 
 	if err := b.templates.ExecuteTemplate(rw, "form.tpl", data); err != nil {

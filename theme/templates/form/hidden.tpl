@@ -1,1 +1,1 @@
-<input type="hidden" name="{{.Field.Var}}" value="{{if ne .Field.Specialty "password"}}{{.Value}}{{end}}">
+<input type="hidden" name="{{.Field.Var}}" value="{{.Value}}">
