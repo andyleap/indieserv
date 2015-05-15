@@ -9,6 +9,8 @@
 
     <title>IndieServ - {{.Name}}</title>
 	<link rel="authorization_endpoint" href="{{Route "IndieAuthEndpoint"}}">
+	<link rel="token_endpoint" href="{{Route "TokenEndpoint"}}">
+	<link rel="micropub" href="{{Route "IndieAuthEndpoint"}}">
     <link href="/static/css/bootstrap.min.css" rel="stylesheet">
     <!--[if lt IE 9]>
       <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>

@@ -64,7 +64,8 @@ func main() {
 		"AbsRoute": blog.AbsRoute,
 		"AutoLink": AutoLink,
 	}))
-	blog.router = mux.NewRouter()
+	mainrouter := mux.NewRouter()
+	blog.router = mainrouter.Host("vendaria.net").Subrouter()
 	blog.db = db
 
 	blog.fb = formbuilder.New(theme.Prefix("templates/form/").Templates())
@@ -110,12 +111,14 @@ func main() {
 	blog.ia.LoginPage = blog.IALoginPage
 	blog.ia.CheckLogin = blog.IACheckLogin
 
-	blog.router.Handle("/indieauth", blog.ia).Name("IndieAuthEndpoint")
+	blog.router.HandleFunc("/indieauth", blog.ia.AuthEndpoint).Name("IndieAuthEndpoint")
+	blog.router.HandleFunc("/token", blog.ia.TokenEndpoint).Name("TokenEndpoint")
+	blog.router.HandleFunc("/micropub", blog.MicroPubEndpoint).Name("MicroPubEndpoint")
 
 	data, _ := ioutil.ReadFile("login.json")
 	json.Unmarshal(data, &blog.li)
 
-	http.ListenAndServe(fmt.Sprintf(":%d", *Port), blog.router)
+	http.ListenAndServe(fmt.Sprintf(":%d", *Port), mainrouter)
 }
 
 func (b *Blog) RequireLogin(handler http.Handler) http.Handler {
