@@ -56,6 +56,9 @@ func (b *Blog) MicroPubEndpoint(rw http.ResponseWriter, req *http.Request) {
 			}
 			rw.Header().Set("Location", b.AbsRoute("Post", "id", entry.Slug()))
 			rw.WriteHeader(http.StatusCreated)
+			b.gp.Publish(source, []byte(""))
+			index, _ := b.router.Get("Home").URL()
+			b.gp.Publish(index, []byte(""))
 			return
 		} else if content != "" {
 			var entry Note
@@ -74,6 +77,9 @@ func (b *Blog) MicroPubEndpoint(rw http.ResponseWriter, req *http.Request) {
 			}
 			rw.Header().Set("Location", b.AbsRoute("Post", "id", entry.Slug()))
 			rw.WriteHeader(http.StatusCreated)
+			b.gp.Publish(source, []byte(""))
+			index, _ := b.router.Get("Home").URL()
+			b.gp.Publish(index, []byte(""))
 			return
 		}
 

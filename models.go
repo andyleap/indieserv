@@ -24,6 +24,7 @@ type PostData struct {
 
 type Post interface {
 	Render(t *template.Template) template.HTML
+	Slug() string
 }
 
 type HEntry struct {

@@ -15,6 +15,7 @@ import (
 	"github.com/andyleap/cookiestore"
 	"github.com/andyleap/formbuilder"
 	"github.com/andyleap/goindieauth"
+	"github.com/andyleap/gopub"
 	"github.com/andyleap/microformats"
 	"github.com/andyleap/tartheme"
 	"github.com/andyleap/webmention"
@@ -35,6 +36,7 @@ type Blog struct {
 	ia             *goindieauth.IndieAuth
 	li             *LoginInfo
 	wm             *webmention.WebMention
+	gp             *gopub.GoPub
 }
 
 type LoginInfo struct {
@@ -54,6 +56,7 @@ func main() {
 	db.Update(func(tx *bolt.Tx) error {
 		tx.CreateBucketIfNotExists([]byte("config"))
 		tx.CreateBucketIfNotExists([]byte("posts"))
+		tx.CreateBucketIfNotExists([]byte("subs"))
 
 		return nil
 	})
@@ -91,12 +94,6 @@ func main() {
 	btns = profileform.NewButtons()
 	btns.AddButton("Save", "Save", "primary")
 
-	postform := blog.fb.NewForm("post")
-	postform.NewString("Message", "Message", "Message", "")
-	postform.NewBool("Draft", "Draft")
-	btns = postform.NewButtons()
-	btns.AddButton("Post", "Post", "primary")
-
 	blog.static = theme.Prefix("static/")
 
 	blog.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", blog.static))
@@ -106,10 +103,6 @@ func main() {
 	authchain := mainchain.Append(blog.RequireLogin)
 	blog.router.Handle("/", mainchain.ThenFunc(blog.Index)).Methods("GET").Name("Home")
 	blog.router.Handle("/post/{id}", mainchain.ThenFunc(blog.Post)).Methods("GET").Name("Post")
-	//blog.router.Handle("/post/{id}", authchain.ThenFunc(blog.SavePost)).Methods("POST").Name("Post")
-	blog.router.Handle("/", authchain.ThenFunc(blog.ContentPost)).Methods("POST").Name("ContentPost")
-	//blog.router.Handle("/login", mainchain.ThenFunc(blog.Login)).Methods("GET").Name("Login")
-	//blog.router.Handle("/login", mainchain.ThenFunc(blog.LoginPost)).Methods("POST").Name("LoginPost")
 	blog.router.Handle("/admin/profile", authchain.ThenFunc(blog.AdminProfile)).Methods("GET").Name("AdminProfile")
 	blog.router.Handle("/admin/profile", authchain.ThenFunc(blog.AdminProfilePost)).Methods("POST").Name("AdminProfilePost")
 
@@ -121,10 +114,15 @@ func main() {
 	blog.wm = webmention.New()
 	blog.wm.Mention = blog.WMMention
 
+	blog.gp = gopub.New(&SubStorage{blog})
+
 	blog.router.HandleFunc("/indieauth", blog.ia.AuthEndpoint).Name("IndieAuthEndpoint")
 	blog.router.HandleFunc("/token", blog.ia.TokenEndpoint).Name("TokenEndpoint")
 	blog.router.HandleFunc("/micropub", blog.MicroPubEndpoint).Name("MicroPubEndpoint")
 	blog.router.HandleFunc("/webmention", blog.wm.WebMentionEndpoint).Name("WebMentionEndpoint")
+	pubhubroute := blog.router.HandleFunc("/hub", blog.wm.WebMentionEndpoint).Name("PubHubEndpoint")
+
+	blog.gp.Hub, _ = pubhubroute.URL()
 
 	data, _ := ioutil.ReadFile("login.json")
 	json.Unmarshal(data, &blog.li)
@@ -170,12 +168,6 @@ func (b *Blog) Index(rw http.ResponseWriter, req *http.Request) {
 		return nil
 	})
 
-	var postformrender template.HTML
-	if loggedin {
-		postform := b.fb.GetForm("post")
-		postformrender = postform.Render(nil, UrlToPath(b.router.Get("ContentPost").URL()), "POST")
-	}
-
 	postsrendered := make([]struct {
 		Rendered template.HTML
 	}, 0, len(posts))
@@ -194,12 +186,10 @@ func (b *Blog) Index(rw http.ResponseWriter, req *http.Request) {
 		Posts   []struct {
 			Rendered template.HTML
 		}
-		PostForm template.HTML
 	}{
 		"Index",
 		profile,
 		postsrendered,
-		postformrender,
 	}
 	err := b.templates.ExecuteTemplate(rw, "index.tpl", data)
 	if err != nil {
@@ -236,75 +226,23 @@ func (b *Blog) Post(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
-	var postformrender template.HTML
-	if loggedin {
-		postform := b.fb.GetForm("post")
-		postformrender = postform.Render(post, UrlToPath(b.router.Get("ContentPost").URL()), "POST")
-	}
 
 	postrendered := post.Render(b.microtemplates)
 
 	data := struct {
-		Name     string
-		Profile  Profile
-		Post     template.HTML
-		PostForm template.HTML
+		Name    string
+		Profile Profile
+		Post    template.HTML
+		Slug    string
 	}{
 		"Post",
 		profile,
 		postrendered,
-		postformrender,
+		post.Slug(),
 	}
 	err := b.templates.ExecuteTemplate(rw, "post.tpl", data)
 	if err != nil {
 		fmt.Println(err)
-	}
-}
-
-func (b *Blog) ContentPost(rw http.ResponseWriter, req *http.Request) {
-	form := b.fb.GetForm("post")
-	var data Note
-	form.Parse(req.FormValue, &data)
-	data.Published = time.Now()
-
-	b.db.Update(func(tx *bolt.Tx) error {
-		posts := tx.Bucket([]byte("posts"))
-		posts.Put(TimeToID(data.Published), MarshalPost(data))
-		return nil
-	})
-	http.Redirect(rw, req, UrlToPath(b.router.Get("Home").URL()), http.StatusSeeOther)
-}
-
-func (b *Blog) Login(rw http.ResponseWriter, req *http.Request) {
-	loginform := b.fb.GetForm("login")
-	data := struct {
-		Name     string
-		FormName string
-		Form     template.HTML
-	}{
-		"Login",
-		"Login",
-		loginform.Render(nil, "/login", "POST"),
-	}
-
-	if err := b.templates.ExecuteTemplate(rw, "form.tpl", data); err != nil {
-		fmt.Println(err)
-	}
-}
-
-func (b *Blog) LoginPost(rw http.ResponseWriter, req *http.Request) {
-	form := b.fb.GetForm("login")
-	data := struct {
-		Username string
-		Password string
-	}{}
-	form.Parse(req.FormValue, &data)
-
-	if data.Username == "Vendan" && data.Password == "password" {
-		s := b.c.GetSession(req)
-		s.Values["user"] = "Vendan"
-		s.Save(rw)
-		http.Redirect(rw, req, UrlToPath(b.router.Get("AdminProfile").URL()), http.StatusSeeOther)
 	}
 }
 
