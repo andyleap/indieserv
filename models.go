@@ -104,7 +104,7 @@ func (a Article) Render(t *template.Template) template.HTML {
 	return template.HTML(buf.String())
 }
 
-func (n Note) MentionItems() []struct {
+func (e HEntry) MentionItems() []struct {
 	Content string
 	URL     string
 	Mention *Mention
@@ -114,7 +114,7 @@ func (n Note) MentionItems() []struct {
 		URL     string
 		Mention *Mention
 	}, 0)
-	for _, m := range n.Mentions {
+	for _, m := range e.Mentions {
 		renContent := ""
 		renURL := ""
 		if content, ok := m.Data.Properties["content"]; ok && renContent == "" {
