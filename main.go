@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -369,28 +370,31 @@ func (b *Blog) IACheckLogin(user, password string) bool {
 
 func (b *Blog) WMMention(source, target *url.URL, data *microformats.Data) {
 	req, _ := http.NewRequest("GET", target.String(), nil)
+	log.Printf("WebMention from %s, to %s", source.String(), target.String())
 	rm := &mux.RouteMatch{}
 	b.router.Match(req, rm)
 	originentry := getEntry(data)
-	switch rm.Route.GetName() {
-	case "Post":
-		id := rm.Vars["id"]
-		b.db.Update(func(tx *bolt.Tx) error {
-			postbucket := tx.Bucket([]byte("posts"))
-			postdata := postbucket.Get(TimeToID(SlugToTime(id)))
-			post := UnmarshalPost(postdata)
-			switch tpost := post.(type) {
-			case Note:
-				tpost.Mentions = append(tpost.Mentions, &Mention{
-					Source:    source,
-					Published: time.Now(),
-					Data:      originentry,
-				})
-				post = tpost
-			}
-			postbucket.Put(TimeToID(SlugToTime(id)), MarshalPost(post))
-			return nil
-		})
+	if rm.Route != nil {
+		switch rm.Route.GetName() {
+		case "Post":
+			id := rm.Vars["id"]
+			b.db.Update(func(tx *bolt.Tx) error {
+				postbucket := tx.Bucket([]byte("posts"))
+				postdata := postbucket.Get(TimeToID(SlugToTime(id)))
+				post := UnmarshalPost(postdata)
+				switch tpost := post.(type) {
+				case Note:
+					tpost.Mentions = append(tpost.Mentions, &Mention{
+						Source:    source,
+						Published: time.Now(),
+						Data:      originentry,
+					})
+					post = tpost
+				}
+				postbucket.Put(TimeToID(SlugToTime(id)), MarshalPost(post))
+				return nil
+			})
+		}
 	}
 }
 
