@@ -81,7 +81,8 @@
 <div class="row">
 <div class="col-sm-3 h-card">
 	<h3>Profile</h3>
-	<a class="p-name u-url" href="{{.Profile.HomeURL}}">{{.Profile.Name}}</a>
+	<a class="p-name u-url" href="{{AbsRoute "Home"}}">{{.Profile.Name}}</a>
+	<br>
 	<a href="{{.Profile.Github}}" rel="me">Github</a>
 </div>
 <div class="col-sm-9">
