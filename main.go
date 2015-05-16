@@ -120,7 +120,7 @@ func main() {
 	blog.router.HandleFunc("/token", blog.ia.TokenEndpoint).Name("TokenEndpoint")
 	blog.router.HandleFunc("/micropub", blog.MicroPubEndpoint).Name("MicroPubEndpoint")
 	blog.router.HandleFunc("/webmention", blog.wm.WebMentionEndpoint).Name("WebMentionEndpoint")
-	pubhubroute := blog.router.HandleFunc("/hub", blog.wm.WebMentionEndpoint).Name("PubHubEndpoint")
+	pubhubroute := blog.router.HandleFunc("/hub", blog.gp.HubEndpoint).Name("PubHubEndpoint")
 
 	blog.gp.Hub, _ = pubhubroute.URL()
 
