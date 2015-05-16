@@ -384,6 +384,7 @@ func (b *Blog) WMMention(source, target *url.URL, data *microformats.Data) {
 				tpost.Mentions = append(tpost.Mentions, &Mention{
 					Source:    source,
 					Published: time.Now(),
+					Data:      originentry,
 				})
 				post = tpost
 			}
