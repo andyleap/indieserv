@@ -346,6 +346,8 @@ func (b *Blog) AdminProfilePost(rw http.ResponseWriter, req *http.Request) {
 
 func (b *Blog) IALoginPage(rw http.ResponseWriter, user, token, client_id string) {
 	loginform := b.fb.GetForm("login")
+	s := b.c.GetSession(req)
+	s.Save(rw)
 	formdata := struct {
 		me    string
 		token string
@@ -373,7 +375,10 @@ func (b *Blog) IAInfoPage(rw http.ResponseWriter) {
 }
 
 func (b *Blog) IACheckLogin(user, password string) bool {
-	if user == b.li.Me && password == b.li.Password {
+	s := b.c.GetSession(req)
+	_, ok := s.Values["user"]
+	if user == b.li.Me && (ok || password == b.li.Password) {
+		s.Values["user"] = b.li.Me
 		return true
 	}
 	return false
