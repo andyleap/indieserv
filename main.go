@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/andyleap/cookiestore"
@@ -310,8 +311,7 @@ func (b *Blog) IACheckLogin(rw http.ResponseWriter, req *http.Request, user, pas
 	s := b.c.GetSession(req)
 	_, ok := s.Values["user"]
 	s.Save(rw)
-	userURL, _ := url.Parse(user)
-	if userURL.String() == b.AbsRoute("Home") && (ok || password == b.profile.Password) {
+	if strings.EqualFold(user, b.profile.Host) && (ok || password == b.profile.Password) {
 		s.Values["user"] = b.AbsRoute("Home")
 		return true
 	}
