@@ -310,7 +310,8 @@ func (b *Blog) IACheckLogin(rw http.ResponseWriter, req *http.Request, user, pas
 	s := b.c.GetSession(req)
 	_, ok := s.Values["user"]
 	s.Save(rw)
-	if user == b.AbsRoute("Home") && (ok || password == b.profile.Password) {
+	userURL, _ := url.Parse(user)
+	if userURL.String() == b.AbsRoute("Home") && (ok || password == b.profile.Password) {
 		s.Values["user"] = b.AbsRoute("Home")
 		return true
 	}
