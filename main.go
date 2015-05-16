@@ -8,12 +8,15 @@ import (
 	"html/template"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/andyleap/cookiestore"
 	"github.com/andyleap/formbuilder"
 	"github.com/andyleap/goindieauth"
+	"github.com/andyleap/microformats"
 	"github.com/andyleap/tartheme"
+	"github.com/andyleap/webmention"
 
 	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
@@ -30,6 +33,7 @@ type Blog struct {
 	c              *cookiestore.CookieStore
 	ia             *goindieauth.IndieAuth
 	li             *LoginInfo
+	wm             *webmention.WebMention
 }
 
 type LoginInfo struct {
@@ -111,9 +115,13 @@ func main() {
 	blog.ia.LoginPage = blog.IALoginPage
 	blog.ia.CheckLogin = blog.IACheckLogin
 
+	blog.wm = webmention.New()
+	blog.wm.Mention = blog.WMMention
+
 	blog.router.HandleFunc("/indieauth", blog.ia.AuthEndpoint).Name("IndieAuthEndpoint")
 	blog.router.HandleFunc("/token", blog.ia.TokenEndpoint).Name("TokenEndpoint")
 	blog.router.HandleFunc("/micropub", blog.MicroPubEndpoint).Name("MicroPubEndpoint")
+	blog.router.HandleFunc("/webmention", blog.wm.WebMentionEndpoint).Name("WebMentionEndpoint")
 
 	data, _ := ioutil.ReadFile("login.json")
 	json.Unmarshal(data, &blog.li)
@@ -355,6 +363,74 @@ func (b *Blog) IAInfoPage(rw http.ResponseWriter) {
 func (b *Blog) IACheckLogin(user, password string) bool {
 	if user == b.li.Me && password == b.li.Password {
 		return true
+	}
+	return false
+}
+
+func (b *Blog) WMMention(source, target *url.URL, data *microformats.Data) {
+	req, _ := http.NewRequest("GET", target.String(), nil)
+	rm := &mux.RouteMatch{}
+	b.router.Match(req, rm)
+	originentry := getEntry(data)
+	switch rm.Route.GetName() {
+	case "Post":
+		id := rm.Vars["id"]
+		b.db.Update(func(tx *bolt.Tx) error {
+			postbucket := tx.Bucket([]byte("posts"))
+			postdata := postbucket.Get(TimeToID(SlugToTime(id)))
+			post := UnmarshalPost(postdata)
+			switch tpost := post.(type) {
+			case Note:
+				tpost.Mentions = append(tpost.Mentions, &Mention{
+					Source:    source,
+					Published: time.Now(),
+				})
+				post = tpost
+			}
+			postbucket.Put(TimeToID(SlugToTime(id)), MarshalPost(post))
+			return nil
+		})
+	}
+}
+
+func getEntry(data *microformats.Data) *microformats.MicroFormat {
+	for _, item := range data.Items {
+		entry := getEntryRecurse(item)
+		if entry != nil {
+			return entry
+		}
+	}
+	return nil
+}
+
+func getEntryRecurse(item *microformats.MicroFormat) *microformats.MicroFormat {
+	if stringInSlice("h-entry", item.Type) {
+		return item
+	}
+	for _, subitem := range item.Children {
+		entry := getEntryRecurse(subitem)
+		if entry != nil {
+			return entry
+		}
+	}
+	for _, prop := range item.Properties {
+		for _, propitem := range prop {
+			if subitem, ok := propitem.(*microformats.MicroFormat); ok {
+				entry := getEntryRecurse(subitem)
+				if entry != nil {
+					return entry
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
 	}
 	return false
 }

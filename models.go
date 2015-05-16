@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"net/url"
 	"time"
+
+	"github.com/andyleap/microformats"
 )
 
 type Profile struct {
@@ -25,12 +28,19 @@ type Post interface {
 
 type HEntry struct {
 	Published time.Time
+	Mentions  []*Mention
 }
 
 type Note struct {
 	HEntry
 	Message string
 	Draft   bool
+}
+
+type Mention struct {
+	Source    *url.URL
+	Data      *microformats.MicroFormat
+	Published time.Time
 }
 
 const (
@@ -68,6 +78,50 @@ func (n Note) Render(t *template.Template) template.HTML {
 		fmt.Println(err)
 	}
 	return template.HTML(buf.String())
+}
+
+func (m Mention) Render(t *template.Template) template.HTML {
+	buf := &bytes.Buffer{}
+	renContent := ""
+	renURL := ""
+	if content, ok := m.Data.Properties["content"]; ok {
+		if content, ok := content[0].(*microformats.MicroFormat); ok {
+			renContent = content.Value
+		}
+	}
+	if summary, ok := m.Data.Properties["summary"]; ok {
+		if summary, ok := summary[0].(string); ok {
+			renContent = summary
+		}
+	}
+	if name, ok := m.Data.Properties["name"]; ok {
+		if name, ok := name[0].(string); ok {
+			renContent = name
+		}
+	}
+	if url, ok := m.Data.Properties["url"]; ok {
+		if url, ok := url[0].(string); ok {
+			renURL = url
+		}
+	}
+	data := struct {
+		Content string
+		URL     string
+		Mention Mention
+	}{
+		renContent,
+		renURL,
+		m,
+	}
+
+	if err := t.ExecuteTemplate(buf, "mention.tpl", data); err != nil {
+		fmt.Println(err)
+	}
+	return template.HTML(buf.String())
+}
+
+func (h HEntry) Render(t *template.Template) template.HTML {
+	return template.HTML("")
 }
 
 func (e HEntry) Slug() string {
