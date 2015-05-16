@@ -63,11 +63,13 @@ func main() {
 		"Route":    blog.Route,
 		"AbsRoute": blog.AbsRoute,
 		"AutoLink": AutoLink,
+		"SafeHTML": SafeHTML,
 	}))
 	blog.microtemplates = theme.Prefix("templates/microformats/").AddTemplates(template.New("default").Funcs(template.FuncMap{
 		"Route":    blog.Route,
 		"AbsRoute": blog.AbsRoute,
 		"AutoLink": AutoLink,
+		"SafeHTML": SafeHTML,
 	}))
 	mainrouter := mux.NewRouter()
 	blog.router = mainrouter.Host("vendaria.net").Subrouter()
@@ -159,6 +161,10 @@ func (b *Blog) Index(rw http.ResponseWriter, req *http.Request) {
 				if loggedin || !post.Draft {
 					posts = append(posts, post)
 				}
+			case Article:
+				if loggedin || !post.Draft {
+					posts = append(posts, post)
+				}
 			}
 		}
 		return nil
@@ -217,6 +223,11 @@ func (b *Blog) Post(rw http.ResponseWriter, req *http.Request) {
 	})
 	switch post := post.(type) {
 	case Note:
+		if !loggedin && post.Draft {
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+	case Article:
 		if !loggedin && post.Draft {
 			rw.WriteHeader(http.StatusNotFound)
 			return

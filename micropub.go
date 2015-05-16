@@ -26,7 +26,7 @@ func (b *Blog) MicroPubEndpoint(rw http.ResponseWriter, req *http.Request) {
 	}
 	switch req.FormValue("h") {
 	case "entry":
-		//name := req.FormValue("name")
+		name := req.FormValue("name")
 		//summary := req.FormValue("summary")
 		content := req.FormValue("content")
 		//published := req.FormValue("published")
@@ -38,8 +38,26 @@ func (b *Blog) MicroPubEndpoint(rw http.ResponseWriter, req *http.Request) {
 		//repost_of := req.FormValue("repost-of")
 		//syndication := req.FormValue("syndication")
 		//mp_syndicate_to := req.FormValue("mp-syndicate-to")
-
-		if content != "" {
+		if name != "" {
+			var entry Article
+			entry.Title = name
+			entry.Content = content
+			entry.Published = time.Now()
+			b.db.Update(func(tx *bolt.Tx) error {
+				posts := tx.Bucket([]byte("posts"))
+				posts.Put(TimeToID(entry.Published), MarshalPost(entry))
+				return nil
+			})
+			links := ScanLinks(content)
+			source, _ := b.router.Get("Post").URL("id", entry.Slug())
+			for _, link := range links {
+				log.Printf("Sending notification to %s", link.String())
+				b.wm.SendNotification(link, source)
+			}
+			rw.Header().Set("Location", b.AbsRoute("Post", "id", entry.Slug()))
+			rw.WriteHeader(http.StatusCreated)
+			return
+		} else if content != "" {
 			var entry Note
 			entry.Message = content
 			entry.Published = time.Now()

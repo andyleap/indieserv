@@ -37,6 +37,13 @@ type Note struct {
 	Draft   bool
 }
 
+type Article struct {
+	HEntry
+	Title   string
+	Content string
+	Draft   bool
+}
+
 type Mention struct {
 	Source    *url.URL
 	Data      *microformats.MicroFormat
@@ -44,7 +51,8 @@ type Mention struct {
 }
 
 const (
-	TypeNote = "note"
+	TypeNote    = "note"
+	TypeArticle = "article"
 )
 
 func UnmarshalPost(data []byte) Post {
@@ -67,6 +75,8 @@ func MarshalPost(post Post) []byte {
 	switch post.(type) {
 	case Note:
 		data.Type = TypeNote
+	case Article:
+		data.Type = TypeArticle
 	}
 	datadata, _ := json.Marshal(data)
 	return datadata
@@ -76,6 +86,15 @@ func (n Note) Render(t *template.Template) template.HTML {
 	buf := &bytes.Buffer{}
 
 	if err := t.ExecuteTemplate(buf, "note.tpl", n); err != nil {
+		fmt.Println(err)
+	}
+	return template.HTML(buf.String())
+}
+
+func (a Article) Render(t *template.Template) template.HTML {
+	buf := &bytes.Buffer{}
+
+	if err := t.ExecuteTemplate(buf, "article.tpl", a); err != nil {
 		fmt.Println(err)
 	}
 	return template.HTML(buf.String())
