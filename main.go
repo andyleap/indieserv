@@ -344,10 +344,8 @@ func (b *Blog) AdminProfilePost(rw http.ResponseWriter, req *http.Request) {
 	http.Redirect(rw, req, UrlToPath(b.router.Get("AdminProfile").URL()), http.StatusSeeOther)
 }
 
-func (b *Blog) IALoginPage(rw http.ResponseWriter, user, token, client_id string) {
+func (b *Blog) IALoginPage(rw http.ResponseWriter, req *http.Request, user, token, client_id string) {
 	loginform := b.fb.GetForm("login")
-	s := b.c.GetSession(req)
-	s.Save(rw)
 	formdata := struct {
 		me    string
 		token string
@@ -370,13 +368,14 @@ func (b *Blog) IALoginPage(rw http.ResponseWriter, user, token, client_id string
 	}
 }
 
-func (b *Blog) IAInfoPage(rw http.ResponseWriter) {
+func (b *Blog) IAInfoPage(rw http.ResponseWriter, req *http.Request) {
 
 }
 
-func (b *Blog) IACheckLogin(user, password string) bool {
+func (b *Blog) IACheckLogin(rw http.ResponseWriter, req *http.Request, user, password string) bool {
 	s := b.c.GetSession(req)
 	_, ok := s.Values["user"]
+	s.Save(rw)
 	if user == b.li.Me && (ok || password == b.li.Password) {
 		s.Values["user"] = b.li.Me
 		return true
