@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -47,7 +48,12 @@ func (b *Blog) MicroPubEndpoint(rw http.ResponseWriter, req *http.Request) {
 				posts.Put(TimeToID(entry.Published), MarshalPost(entry))
 				return nil
 			})
-			rw.Header().Set("Location", b.Route("Post", "id", entry.Slug()))
+			links := ScanLinks(content)
+			for _, link := range links {
+				log.Printf("Sending notification to %s", link.String())
+				b.wm.SendNotification(link, b.AbsRoute("Post", "id", entry.Slug()))
+			}
+			rw.Header().Set("Location", b.AbsRoute("Post", "id", entry.Slug()))
 			rw.WriteHeader(http.StatusCreated)
 			return
 		}
