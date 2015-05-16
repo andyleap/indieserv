@@ -63,6 +63,10 @@ func UnmarshalPost(data []byte) Post {
 		var note Note
 		json.Unmarshal(*post.Content, &note)
 		return note
+	case TypeArticle:
+		var article Article
+		json.Unmarshal(*post.Content, &article)
+		return note
 	}
 	return nil
 }
