@@ -94,17 +94,17 @@ func (n Note) MentionItems() []struct {
 	for _, m := range n.Mentions {
 		renContent := ""
 		renURL := ""
-		if content, ok := m.Data.Properties["content"]; ok {
+		if content, ok := m.Data.Properties["content"]; ok && renContent == "" {
 			if content, ok := content[0].(*microformats.MicroFormat); ok {
 				renContent = content.Value
 			}
 		}
-		if summary, ok := m.Data.Properties["summary"]; ok {
+		if summary, ok := m.Data.Properties["summary"]; ok && renContent == "" {
 			if summary, ok := summary[0].(string); ok {
 				renContent = summary
 			}
 		}
-		if name, ok := m.Data.Properties["name"]; ok {
+		if name, ok := m.Data.Properties["name"]; ok && renContent == "" {
 			if name, ok := name[0].(string); ok {
 				renContent = name
 			}

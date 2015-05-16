@@ -7,6 +7,6 @@
 		<a class="u-url" href="{{AbsRoute "Post" "id" .Slug}}">{{AbsRoute "Post" "id" .Slug}}</a>
 	</div>
 	{{range .MentionItems}}
-	{{template "mention.tpl"}}
+	{{template "mention.tpl" .}}
 	{{end}}
 </div>
