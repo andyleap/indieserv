@@ -11,12 +11,6 @@ import (
 	"github.com/andyleap/microformats"
 )
 
-type Profile struct {
-	Name    string
-	HomeURL string
-	Github  string
-}
-
 type PostData struct {
 	Type    string
 	Content *json.RawMessage

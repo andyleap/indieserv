@@ -34,7 +34,7 @@ type Blog struct {
 	fb             *formbuilder.FormBuilder
 	c              *cookiestore.CookieStore
 	ia             *goindieauth.IndieAuth
-	li             *LoginInfo
+	profile        *Profile
 	wm             *webmention.WebMention
 	gp             *gopub.GoPub
 }
@@ -48,8 +48,16 @@ var (
 	Port = flag.Int("Port", 3000, "Specifies the port to listen on")
 )
 
+type Profile struct {
+	Name     string
+	Password string
+	Host     string
+	Github   string
+}
+
 func main() {
 	flag.Parse()
+
 	theme, _ := tartheme.LoadDir("theme")
 	db, _ := bolt.Open("blog.db", 0666, nil)
 
@@ -57,11 +65,14 @@ func main() {
 		tx.CreateBucketIfNotExists([]byte("config"))
 		tx.CreateBucketIfNotExists([]byte("posts"))
 		tx.CreateBucketIfNotExists([]byte("subs"))
-
 		return nil
 	})
 
 	blog := &Blog{}
+
+	data, _ := ioutil.ReadFile("profile.json")
+	json.Unmarshal(data, &blog.profile)
+
 	blog.templates = theme.Prefix("templates/").AddTemplates(template.New("default").Funcs(template.FuncMap{
 		"Route":    blog.Route,
 		"AbsRoute": blog.AbsRoute,
@@ -75,7 +86,7 @@ func main() {
 		"SafeHTML": SafeHTML,
 	}))
 	mainrouter := mux.NewRouter()
-	blog.router = mainrouter.Host("vendaria.net").Subrouter()
+	blog.router = mainrouter.Host(blog.profile.Host).Subrouter()
 	blog.db = db
 
 	blog.fb = formbuilder.New(theme.Prefix("templates/form/").Templates())
@@ -123,9 +134,6 @@ func main() {
 	pubhubroute := blog.router.HandleFunc("/hub", blog.gp.HubEndpoint).Name("PubHubEndpoint")
 
 	blog.gp.Hub, _ = pubhubroute.URL()
-
-	data, _ := ioutil.ReadFile("login.json")
-	json.Unmarshal(data, &blog.li)
 
 	http.ListenAndServe(fmt.Sprintf(":%d", *Port), blog.router)
 }
@@ -247,13 +255,6 @@ func (b *Blog) Post(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (b *Blog) AdminProfile(rw http.ResponseWriter, req *http.Request) {
-	var profile *Profile
-
-	b.db.View(func(tx *bolt.Tx) error {
-		profiledata := tx.Bucket([]byte("config")).Get([]byte("Profile"))
-		json.Unmarshal(profiledata, profile)
-		return nil
-	})
 	profileform := b.fb.GetForm("profile")
 	data := struct {
 		Name     string
@@ -262,7 +263,7 @@ func (b *Blog) AdminProfile(rw http.ResponseWriter, req *http.Request) {
 	}{
 		"Profile",
 		"Profile",
-		profileform.Render(nil, UrlToPath(b.router.Get("AdminProfilePost").URL()), "POST"),
+		profileform.Render(b.profile, UrlToPath(b.router.Get("AdminProfilePost").URL()), "POST"),
 	}
 	if err := b.templates.ExecuteTemplate(rw, "form.tpl", data); err != nil {
 		fmt.Println(err)
@@ -271,14 +272,9 @@ func (b *Blog) AdminProfile(rw http.ResponseWriter, req *http.Request) {
 
 func (b *Blog) AdminProfilePost(rw http.ResponseWriter, req *http.Request) {
 	form := b.fb.GetForm("profile")
-	data := &Profile{}
-	form.Parse(req.FormValue, data)
-	b.db.Update(func(tx *bolt.Tx) error {
-		config := tx.Bucket([]byte("config"))
-		jsondata, _ := json.Marshal(data)
-		config.Put([]byte("Profile"), jsondata)
-		return nil
-	})
+	form.Parse(req.FormValue, &b.profile)
+	data, _ := json.Marshal(b.profile)
+	ioutil.WriteFile("profile.json", data, 0600)
 	http.Redirect(rw, req, UrlToPath(b.router.Get("AdminProfile").URL()), http.StatusSeeOther)
 }
 
@@ -314,8 +310,8 @@ func (b *Blog) IACheckLogin(rw http.ResponseWriter, req *http.Request, user, pas
 	s := b.c.GetSession(req)
 	_, ok := s.Values["user"]
 	s.Save(rw)
-	if user == b.li.Me && (ok || password == b.li.Password) {
-		s.Values["user"] = b.li.Me
+	if user == b.AbsRoute("Home") && (ok || password == b.profile.Password) {
+		s.Values["user"] = b.AbsRoute("Home")
 		return true
 	}
 	return false
