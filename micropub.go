@@ -49,9 +49,10 @@ func (b *Blog) MicroPubEndpoint(rw http.ResponseWriter, req *http.Request) {
 				return nil
 			})
 			links := ScanLinks(content)
+			source, _ := b.router.Get("Post").URL("id", entry.Slug())
 			for _, link := range links {
 				log.Printf("Sending notification to %s", link.String())
-				b.wm.SendNotification(link, b.AbsRoute("Post", "id", entry.Slug()))
+				b.wm.SendNotification(link, source)
 			}
 			rw.Header().Set("Location", b.AbsRoute("Post", "id", entry.Slug()))
 			rw.WriteHeader(http.StatusCreated)
