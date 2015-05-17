@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/andyleap/boltinspect"
 	"github.com/andyleap/cookiestore"
 	"github.com/andyleap/formbuilder"
 	"github.com/andyleap/goindieauth"
@@ -38,6 +39,7 @@ type Blog struct {
 	profile        *Profile
 	wm             *webmention.WebMention
 	gp             *gopub.GoPub
+	bi             *boltinspect.BoltInspect
 }
 
 type LoginInfo struct {
@@ -127,6 +129,9 @@ func main() {
 	blog.wm.Mention = blog.WMMention
 
 	blog.gp = gopub.New(&SubStorage{blog})
+
+	blog.bi = boltinspect.New(blog.db)
+	blog.router.HandleFunc("/boltdb", blog.bi.InspectEndpoint).Name("BoltInspectEndpoint")
 
 	blog.router.HandleFunc("/indieauth", blog.ia.AuthEndpoint).Name("IndieAuthEndpoint")
 	blog.router.HandleFunc("/token", blog.ia.TokenEndpoint).Name("TokenEndpoint")
