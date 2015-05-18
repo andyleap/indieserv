@@ -68,6 +68,7 @@ func main() {
 		tx.CreateBucketIfNotExists([]byte("config"))
 		tx.CreateBucketIfNotExists([]byte("posts"))
 		tx.CreateBucketIfNotExists([]byte("subs"))
+		tx.CreateBucketIfNotExists([]byte("mentions"))
 		return nil
 	})
 
@@ -326,6 +327,12 @@ func (b *Blog) IACheckLogin(rw http.ResponseWriter, req *http.Request, user, pas
 func (b *Blog) WMMention(source, target *url.URL, data *microformats.Data) {
 	req, _ := http.NewRequest("GET", target.String(), nil)
 	log.Printf("WebMention from %s, to %s", source.String(), target.String())
+	b.db.Update(func(tx *bolt.Tx) error {
+		mentionbucket := tx.Bucket([]byte("mentions"))
+		jsondata, _ := json.Marshal(data)
+		mentionbucket.Put([]byte(fmt.Sprintf("%s-%s", source.String(), target.String())), jsondata)
+		return nil
+	})
 	rm := &mux.RouteMatch{}
 	b.router.Match(req, rm)
 	originentry := getEntry(data)
